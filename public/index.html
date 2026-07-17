@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIRA Local Print Agent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #f8fafc;
+        }
+
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+         #sidebar {
+            transition: width 0.3s ease-in-out;
+            width: 280px; 
+        }
+        .sidebar-text {
+            transition: opacity 0.2s ease, width 0.3s ease, margin 0.3s ease;
+            white-space: nowrap;
+            overflow: hidden;
+            opacity: 1;
+            width: 100%;
+        }
+        
+        @media (min-width: 768px) {
+            #sidebar.collapsed { width: 88px; }
+            #sidebar.collapsed .sidebar-text { opacity: 0; width: 0; margin: 0; padding: 0; }
+            #sidebar.collapsed .sidebar-header-icon { margin: 0 auto; }
+            #sidebar.collapsed .shutdown-btn { padding: 0.75rem; justify-content: center; }
+            #sidebar.collapsed .vector-container { display: none; }
+        }
+    </style>
+</head>
+<body class="text-slate-800 flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-slate-50">
+
+    <div id="authOverlay" class="fixed inset-0 bg-slate-900 z-[100] flex flex-col items-center justify-center hidden">
+        <div class="mb-8 text-center flex flex-col items-center">
+            <div class="bg-white p-2 rounded-full shadow-lg mb-4 flex items-center justify-center h-20 w-20">
+                <img src="aira-logo.png" alt="Aira" class="h-full w-full object-cover rounded-full" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMGUxNzJhIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTE3IDE3aDJhMiAyIDAgMDAyLTJ2LTRhMiAyIDAgMDAtMi0ySDVhMiAyIDAgMDAtMiAydjRhMiAyIDAgMDAyIDJoMm0yIDRoNmEyIDIgMCAwMDItMnYtNGEyIDIgMCAwMC0yLTJIOWEyIDIgMCAwMC0yIDJ2NGgxMHoiLz48L3N2Zz4='">
+            </div>
+            <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-white mb-1">AIRA Print Agent</h1>
+            <p class="text-slate-400 text-sm tracking-wide">Mencetak Dokumen secara Otomatis</p>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-700 w-full max-w-sm overflow-hidden transform transition-all mx-4 relative">
+            <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 to-blue-500"></div>
+            <div class="p-6 md:p-8 pt-10">
+                <h2 id="authTitle" class="text-xl font-bold text-slate-800 text-center mb-2">Autentikasi</h2>
+                <p id="authSubtitle" class="text-[12px] md:text-xs text-slate-500 text-center mb-8 leading-relaxed">Silakan masukkan password.</p>
+                
+                <form id="authForm" class="flex flex-col gap-5">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2">Password Akses</label>
+                        <input type="password" id="authPassword" required class="w-full px-4 py-3 text-[14px] border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none transition-all shadow-sm text-slate-700 bg-slate-50 focus:bg-white" placeholder="••••••••">
+                    </div>
+                    <button type="submit" id="authBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-[13px] font-semibold py-3 rounded-xl transition-colors shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 mt-2">
+                        Masuk
+                    </button>
+                    <p id="authMessage" class="text-[12px] text-center hidden font-medium"></p>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="changePasswordOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center hidden">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden p-6 mx-4">
+            <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
+                Ubah Password
+            </h2>
+            <form id="changePasswordForm" class="flex flex-col gap-4">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1.5">Password Lama</label>
+                    <input type="password" id="cpOldPassword" required class="w-full px-3 py-2 text-[13px] border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1.5">Password Baru</label>
+                    <input type="password" id="cpNewPassword" required class="w-full px-3 py-2 text-[13px] border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none">
+                </div>
+                <div class="flex justify-end gap-2 mt-2">
+                    <button type="button" onclick="closeChangePasswordModal()" class="px-4 py-2 text-[12px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">Batal</button>
+                    <button type="submit" class="px-4 py-2 text-[12px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-md">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <aside id="sidebar" class="bg-slate-900 text-white flex flex-col justify-between shrink-0 relative z-50 border-r border-slate-800 shadow-xl w-full md:w-[280px] h-auto md:h-screen">
+        
+        <button onclick="toggleSidebar()" class="hidden md:flex absolute -right-3 top-6 bg-slate-800 text-slate-300 hover:text-white rounded-full p-1.5 border border-slate-700 shadow-lg z-50 transition-colors">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" id="toggleIcon"></path></svg>
+        </button>
+        <div class="p-4 md:p-6 flex md:flex-col justify-between md:justify-start items-center md:items-stretch overflow-hidden h-full">
+            
+            <div class="flex items-center gap-4 mb-0 md:mb-10">
+                <div class="bg-white p-1 rounded-full shrink-0 sidebar-header-icon transition-all shadow-[0_0_15px_rgba(255,255,255,0.15)] flex items-center justify-center h-12 w-12 md:h-14 md:w-14">
+                    <img src="aira-logo.png" alt="Aira" class="h-full w-full object-cover rounded-full" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMGUxNzJhIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTE3IDE3aDJhMiAyIDAgMDAyLTJ2LTRhMiAyIDAgMDAtMi0ySDVhMiAyIDAgMDAtMiAydjRhMiAyIDAgMDAyIDJoMm0yIDRoNmEyIDIgMCAwMDItMnYtNGEyIDIgMCAwMC0yLTJIOWEyIDIgMCAwMC0yIDJ2NGgxMHoiLz48L3N2Zz4='">
+                </div>
+                <div class="sidebar-text flex-1">
+                    <h1 class="text-base md:text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">Print Agent</h1>
+                    <p class="text-[10px] md:text-xs text-slate-400 font-light tracking-wide">Local Print Service</p>
+                </div>
+            </div>
+
+            <div class="hidden md:flex vector-container flex-1 flex-col items-center justify-center opacity-20 pointer-events-none mt-8 mb-8 sidebar-text">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-32 h-32 text-blue-300">
+                    <path d="M17.5 19C19.9853 19 22 16.9853 22 14.5C22 12.1384 20.1837 10.2016 17.8687 10.021C17.4087 7.17066 14.9458 5 12 5C9.37568 5 7.15111 6.8488 6.33158 9.24584C3.89675 9.42948 2 11.4589 2 13.9C2 16.4405 4.05949 18.5 6.6 18.5"></path>
+                    <path d="M12 12v9"></path>
+                    <path d="M9 18l3 3 3-3"></path>
+
+                    <rect x="6" y="14" width="12" height="8" rx="2"></rect>
+                    <path d="M6 18H4a2 2 0 01-2-2v-4a2 2 0 012-2h16a2 2 0 012 2v4a2 2 0 01-2 2h-2"></path>
+                    <path d="M8 10V6h8v4"></path>
+                </svg>
+                <p class="text-[10px] font-mono mt-4 tracking-widest uppercase">Network Spooling</p>
+            </div>
+
+            <button onclick="shutdownAgent()" class="md:hidden ml-4 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white p-2.5 rounded-lg transition-colors border border-red-500/20">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </button>
+        </div>
+
+        <div class="hidden md:flex px-6 pb-16 pt-4 overflow-hidden flex-col gap-2">
+            <div class="h-px w-full bg-gradient-to-r from-transparent via-slate-700 to-transparent mb-2 opacity-50"></div>
+            <button onclick="showChangePasswordModal()" class="w-full flex items-center justify-start gap-3 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white p-3.5 rounded-xl text-sm font-medium transition-all backdrop-blur-sm border border-white/5 hover:border-white/10 hover:shadow-lg hover:shadow-black/20 group">
+                <div class="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                    <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
+                </div>
+                <span class="sidebar-text text-[13px] tracking-wide">Ubah Password</span>
+            </button>
+            <button onclick="lockAgent()" class="w-full flex items-center justify-start gap-3 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white p-3.5 rounded-xl text-sm font-medium transition-all backdrop-blur-sm border border-white/5 hover:border-white/10 hover:shadow-lg hover:shadow-black/20 group">
+                <div class="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+                    <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                </div>
+                <span class="sidebar-text text-[13px] tracking-wide">Lock Akses</span>
+            </button>
+            <button onclick="shutdownAgent()" class="shutdown-btn w-full flex items-center justify-start gap-3 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white p-3.5 rounded-xl text-sm font-medium transition-all duration-300 border border-red-500/20 hover:border-red-500 hover:shadow-[0_0_20px_rgba(239,68,68,0.3)] group">
+                <div class="p-1.5 rounded-lg bg-red-500/10 text-red-400 group-hover:bg-white/20 group-hover:text-white transition-colors">
+                    <svg class="h-4 w-4 shrink-0 group-hover:rotate-180 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <span class="sidebar-text text-[13px] tracking-wide">Matikan Agent</span>
+            </button>
+        </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col h-screen bg-slate-50 relative">
+
+        <header class="bg-white border-b border-slate-200 px-6 py-3.5 flex justify-between items-center shrink-0 shadow-sm z-20">
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2.5 bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-100 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)]">
+                    <span class="relative flex h-2.5 w-2.5">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_5px_#10b981]"></span>
+                    </span>
+                    <span class="text-emerald-700 text-xs font-bold tracking-widest uppercase">Service Active</span>
+                </div>
+                
+                <div class="hidden md:flex gap-2">
+                    <span class="bg-slate-100 text-slate-500 border border-slate-200 text-[10px] font-mono px-2 py-1 rounded-md shadow-sm">PORT: 18080</span>
+                    <span class="bg-slate-100 text-slate-500 border border-slate-200 text-[10px] font-mono px-2 py-1 rounded-md shadow-sm">DAEMON: BACKGROUND</span>
+                </div>
+            </div>
+            <div class="text-[11px] text-slate-400 font-semibold tracking-wide hidden sm:block">AIRA Local Print Agent v1.0.4</div>
+        </header>
+
+        <main class="flex-1 p-4 md:p-6 overflow-y-auto relative">
+            <div class="grid grid-cols-1 xl:grid-cols-12 grid-rows-none xl:grid-rows-[5fr_4fr] gap-4 md:gap-6 h-full min-h-[850px]">
+                
+                <div class="xl:col-span-8 bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-slate-200 flex flex-col overflow-hidden min-h-[400px]">
+                    <div class="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center z-10 shrink-0">
+                        <h2 class="text-[13px] md:text-sm font-semibold text-slate-700 flex items-center gap-2.5">
+                            <div class="p-1.5 bg-emerald-100/50 text-emerald-600 rounded-lg shadow-sm border border-emerald-100">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            </div>
+                            Riwayat Cetak
+                        </h2>
+                        <div class="flex items-center gap-2">
+                            <select id="logFilterStatus" onchange="resetLogPage(); loadLogs();" class="text-[11px] font-medium bg-white border border-slate-200 rounded-md px-2 py-1.5 text-slate-600 outline-none hover:border-slate-300 transition-colors shadow-sm cursor-pointer">
+                                <option value="all">Semua Status</option>
+                                <option value="sukses">Sukses</option>
+                                <option value="gagal">Gagal</option>
+                            </select>
+                            <button onclick="loadLogs()" class="text-[11px] font-medium bg-white hover:bg-slate-50 text-slate-600 px-2.5 py-1.5 rounded-md border border-slate-200 transition-colors flex items-center gap-1.5 shadow-sm">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex-1 overflow-y-auto">
+                        <table class="w-full text-left text-[12px] md:text-[13px]">
+                            <thead class="bg-white sticky top-0 shadow-[0_1px_2px_rgba(0,0,0,0.03)] z-10">
+                                <tr class="text-slate-500">
+                                    <th class="px-5 py-3 font-semibold w-24 md:w-32">Waktu</th>
+                                    <th class="px-5 py-3 font-semibold">Dokumen</th>
+                                    <th class="px-5 py-3 font-semibold hidden sm:table-cell">Printer</th>
+                                    <th class="px-5 py-3 font-semibold w-20 md:w-24">Status</th>
+                                    <th class="px-5 py-3 font-semibold hidden md:table-cell">Pesan</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logTableBody" class="divide-y divide-slate-100 bg-white text-slate-600"></tbody>
+                        </table>
+                    </div>
+                    <div class="px-5 py-3 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center shrink-0">
+                        <span id="logPageInfo" class="text-[11px] font-medium text-slate-500">Memuat...</span>
+                        <div class="flex gap-1.5">
+                            <button onclick="prevLogPage()" id="btnPrevLog" class="px-3 py-1 text-[11px] font-semibold bg-white border border-slate-200 rounded-md text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors">Prev</button>
+                            <button onclick="nextLogPage()" id="btnNextLog" class="px-3 py-1 text-[11px] font-semibold bg-white border border-slate-200 rounded-md text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors">Next</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="xl:col-span-4 bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-slate-200 flex flex-col overflow-hidden min-h-[400px]">
+                    <div class="px-4 py-3 border-b border-slate-100 shrink-0 bg-slate-50/50">
+                        <h2 class="text-[13px] font-semibold text-slate-700 flex items-center gap-2">
+                            <div class="p-1 bg-indigo-100/50 text-indigo-600 rounded-md shadow-sm border border-indigo-100">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                            </div>
+                            Pengaturan Mapping
+                        </h2>
+                    </div>
+                    <div class="p-4 flex-1 flex flex-col justify-center">
+                        <form id="mappingForm" class="flex flex-col gap-3">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Tipe Dokumen</label>
+                                <input type="text" id="typeInput" placeholder="Misal: kartu_pasien" required class="w-full px-3 py-2 text-[12px] border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-sm placeholder:text-slate-400 text-slate-700">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Printer Tujuan</label>
+                                <div class="relative">
+                                    <select id="printerSelect" required class="w-full px-3 py-2 text-[12px] border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-sm text-slate-700 appearance-none bg-white">
+                                        <option value="" disabled selected>Memuat daftar printer...</option>
+                                    </select>
+                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+                                        <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Ukuran Kertas <span class="normal-case font-medium text-[9px] text-slate-400">(Opsional)</span></label>
+                                    <input type="text" id="paperSizeInput" title="Harus sama persis dengan nama kertas di Printer Preferences" placeholder="Misal: A4, A5" class="w-full px-3 py-2 text-[12px] border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-sm placeholder:text-slate-400 text-slate-700">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Orientasi</label>
+                                    <div class="relative">
+                                        <select id="orientationSelect" class="w-full px-3 py-2 text-[12px] border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-sm text-slate-700 appearance-none bg-white">
+                                            <option value="">Default Printer</option>
+                                            <option value="portrait">Portrait</option>
+                                            <option value="landscape">Landscape</option>
+                                        </select>
+                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+                                            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-1">
+                                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Margin Kustom <span class="normal-case font-medium text-[9px] text-slate-400">(Opsional, misal: 10mm)</span></label>
+                                <div class="grid grid-cols-4 gap-2">
+                                    <div>
+                                        <label class="block text-[10px] text-slate-400 mb-1">Atas</label>
+                                        <input type="text" id="marginTopInput" placeholder="0mm" class="w-full px-2 py-1.5 text-[12px] border border-slate-200 rounded focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] text-slate-400 mb-1">Kanan</label>
+                                        <input type="text" id="marginRightInput" placeholder="0mm" class="w-full px-2 py-1.5 text-[12px] border border-slate-200 rounded focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] text-slate-400 mb-1">Bawah</label>
+                                        <input type="text" id="marginBottomInput" placeholder="0mm" class="w-full px-2 py-1.5 text-[12px] border border-slate-200 rounded focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] text-slate-400 mb-1">Kiri</label>
+                                        <input type="text" id="marginLeftInput" placeholder="0mm" class="w-full px-2 py-1.5 text-[12px] border border-slate-200 rounded focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-sm">
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="mt-2 w-full bg-slate-900 hover:bg-black text-white text-[12px] font-semibold py-2.5 rounded-lg transition-colors shadow flex items-center justify-center gap-2">
+                                <svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                                Simpan Aturan
+                            </button>
+                            <p id="formMessage" class="text-[12px] text-center hidden font-medium"></p>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="xl:col-span-5 bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-slate-200 flex flex-col overflow-hidden min-h-[300px]">
+                    <div class="px-5 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
+                        <h2 class="text-[13px] md:text-sm font-semibold text-slate-700">Daftar Mapping / Rute Cetak</h2>
+                    </div>
+                    <div class="flex-1 overflow-y-auto">
+                        <table class="w-full text-left text-[12px] md:text-[13px]">
+                            <thead class="bg-white sticky top-0 shadow-[0_1px_2px_rgba(0,0,0,0.03)] z-10">
+                                <tr class="text-slate-500">
+                                    <th class="px-5 py-3 font-semibold">Tipe Dokumen</th>
+                                    <th class="px-5 py-3 font-semibold">Printer</th>
+                                    <th class="px-5 py-3 font-semibold">Kertas & Pengaturan</th>
+                                    <th class="px-5 py-3 font-semibold text-right">Opsi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mappingTableBody" class="divide-y divide-slate-100 bg-white text-slate-600"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="xl:col-span-7 bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-slate-200 flex flex-col overflow-hidden min-h-[300px]">
+                    <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center z-10 shrink-0 bg-slate-50/50">
+                        <h2 class="text-[13px] md:text-sm font-semibold text-slate-700 flex items-center gap-2.5">
+                            <div class="p-1.5 bg-blue-100/50 text-blue-600 rounded-lg shadow-sm border border-blue-100">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            </div>
+                            Antrean Cetak
+                        </h2>
+                        <button onclick="loadJobs()" class="text-[11px] font-medium bg-white hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-md border border-slate-200 transition-colors flex items-center gap-1.5 shadow-sm">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                            Refresh
+                        </button>
+                    </div>
+                    <div class="flex-1 overflow-y-auto">
+                        <table class="w-full text-left text-[12px] md:text-[13px]">
+                            <thead class="bg-white sticky top-0 shadow-[0_1px_2px_rgba(0,0,0,0.03)] z-10">
+                                <tr class="text-slate-500">
+                                    <th class="px-5 py-3 font-semibold">Waktu</th>
+                                    <th class="px-5 py-3 font-semibold">Dokumen</th>
+                                    <th class="px-5 py-3 font-semibold hidden sm:table-cell">Printer</th>
+                                    <th class="px-5 py-3 font-semibold">Status</th>
+                                    <th class="px-5 py-3 font-semibold text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="jobTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- Fetch Interceptor for Auth ---
+        const originalFetch = window.fetch;
+        window.fetch = async function(...args) {
+            let resource = args[0];
+            let config = args[1] || {};
+            
+            if (typeof resource === 'string') {
+                if ((resource.startsWith('/api') && !resource.startsWith('/api/auth')) || resource.startsWith('/printers')) {
+                    if (!config.headers) config.headers = {};
+                    const token = sessionStorage.getItem('agent_token');
+                    if (token) config.headers['x-auth-token'] = token;
+                    args[1] = config; // Reassign config with headers
+                }
+            }
+            
+            const response = await originalFetch.apply(window, args);
+            if (response && response.status === 401) {
+                // Token invalid or missing
+                sessionStorage.removeItem('agent_token');
+                if (typeof dashboardIntervals !== 'undefined') {
+                    dashboardIntervals.forEach(clearInterval);
+                    dashboardIntervals = [];
+                }
+                showAuthModal('login');
+            }
+            return response;
+        };
+
+        // --- Auth Logic ---
+        let dashboardIntervals = [];
+
+        async function checkAuthStatus() {
+            try {
+                const res = await fetch('/api/auth/status');
+                if (!res.ok) throw new Error('Gagal menghubungi API Auth Status. Status: ' + res.status);
+                const data = await res.json();
+                
+                const isAuthSetup = data.isSetup;
+                const token = sessionStorage.getItem('agent_token');
+                
+                if (isAuthSetup && !token) {
+                    showAuthModal('login');
+                } else if (!isAuthSetup) {
+                    showAuthModal('setup');
+                } else {
+                    startDashboard();
+                }
+            } catch (err) {
+                alert('Terjadi kesalahan saat memuat sistem keamanan:\n' + err.message);
+                console.error('Failed to check auth status:', err);
+            }
+        }
+
+        function showAuthModal(mode) {
+            const overlay = document.getElementById('authOverlay');
+            const title = document.getElementById('authTitle');
+            const subtitle = document.getElementById('authSubtitle');
+            const btn = document.getElementById('authBtn');
+            const form = document.getElementById('authForm');
+            const msgEl = document.getElementById('authMessage');
+            
+            if (!overlay) {
+                alert('Elemen authOverlay tidak ditemukan di dokumen!');
+                return;
+            }
+            
+            overlay.classList.remove('hidden');
+            msgEl.classList.add('hidden');
+            document.getElementById('authPassword').value = '';
+            
+            if (mode === 'setup') {
+                title.textContent = 'Pengaturan Password';
+                subtitle.textContent = 'Buat password master baru untuk mengamankan pengaturan agen print lokal ini dari akses tidak sah.';
+                btn.textContent = 'Simpan & Lanjutkan';
+            } else {
+                title.textContent = 'Otorisasi Akses';
+                subtitle.textContent = 'Masukkan password master Anda untuk masuk ke pengaturan print agent.';
+                btn.textContent = 'Login';
+            }
+            
+            form.onsubmit = async (e) => {
+                e.preventDefault();
+                const pwd = document.getElementById('authPassword').value;
+                const endpoint = mode === 'setup' ? '/api/auth/setup' : '/api/auth/login';
+                
+                try {
+                    btn.disabled = true;
+                    btn.classList.add('opacity-70');
+                    
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ password: pwd })
+                    });
+                    const data = await res.json();
+                    
+                    if (data.success) {
+                        sessionStorage.setItem('agent_token', data.token);
+                        overlay.classList.add('hidden');
+                        startDashboard();
+                    } else {
+                        msgEl.textContent = data.message;
+                        msgEl.className = 'mt-4 text-[12px] font-medium text-red-600 block animate-pulse text-center';
+                    }
+                } catch (err) {
+                    msgEl.textContent = 'Terjadi kesalahan sistem';
+                    msgEl.className = 'mt-4 text-[12px] font-medium text-red-600 block text-center';
+                } finally {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-70');
+                }
+            };
+        }
+
+        function startDashboard() {
+            dashboardIntervals.forEach(clearInterval);
+            dashboardIntervals = [];
+            
+            loadPrinters();
+            loadMappings();
+            loadJobs();
+            loadLogs();
+            
+            dashboardIntervals.push(setInterval(loadJobs, 2000));
+            dashboardIntervals.push(setInterval(loadLogs, 5000));
+            
+            resetInactivityTimer();
+        }
+
+        // --- Auto-Lock / Inactivity Timer ---
+        let inactivityTimer;
+        const INACTIVITY_LIMIT_MS = 5 * 60 * 1000; // 5 Menit
+
+        function logoutInactivity() {
+            sessionStorage.removeItem('agent_token');
+            dashboardIntervals.forEach(clearInterval);
+            dashboardIntervals = [];
+            showAuthModal('login');
+            // Menambahkan pesan info ke layar auth
+            const msgEl = document.getElementById('authMessage');
+            if (msgEl) {
+                msgEl.textContent = 'Sesi terkunci otomatis karena tidak ada aktivitas.';
+                msgEl.className = 'mt-4 text-[12px] font-medium text-amber-600 block text-center';
+            }
+        }
+
+        function resetInactivityTimer() {
+            clearTimeout(inactivityTimer);
+            if (sessionStorage.getItem('agent_token')) {
+                inactivityTimer = setTimeout(logoutInactivity, INACTIVITY_LIMIT_MS);
+            }
+        }
+
+        ['mousemove', 'keydown', 'mousedown', 'touchstart'].forEach(evt => {
+            document.addEventListener(evt, resetInactivityTimer);
+        });
+
+
+        // Sidebar Toggle Logic
+        let isCollapsed = window.innerWidth < 1280;
+        
+        function updateSidebarUI() {
+            const sidebar = document.getElementById('sidebar');
+            const icon = document.getElementById('toggleIcon');
+            if (!sidebar) return;
+            
+            if (isCollapsed) {
+                sidebar.classList.add('collapsed');
+                if (icon) icon.setAttribute('d', 'M9 5l7 7-7 7'); 
+            } else {
+                sidebar.classList.remove('collapsed');
+                if (icon) icon.setAttribute('d', 'M15 19l-7-7 7-7'); 
+            }
+        }
+
+        function toggleSidebar() {
+            isCollapsed = !isCollapsed;
+            updateSidebarUI();
+        }
+
+        window.addEventListener('resize', () => {
+            if (window.innerWidth < 1280 && !isCollapsed) {
+                isCollapsed = true;
+                updateSidebarUI();
+            } else if (window.innerWidth >= 1280 && isCollapsed) {
+                isCollapsed = false;
+                updateSidebarUI();
+            }
+        });
+        updateSidebarUI();
+
+        const typeInput = document.getElementById('typeInput');
+        const printerSelect = document.getElementById('printerSelect');
+        const mappingForm = document.getElementById('mappingForm');
+        const mappingTableBody = document.getElementById('mappingTableBody');
+        const formMessage = document.getElementById('formMessage');
+        const jobTableBody = document.getElementById('jobTableBody');
+
+        async function loadPrinters() {
+            try {
+                const res = await fetch('/printers');
+                const data = await res.json();
+                if (data.success && data.printers.length > 0) {
+                    printerSelect.innerHTML = '<option value="" disabled selected>Pilih Printer...</option>';
+                    data.printers.forEach(p => {
+                        const option = document.createElement('option');
+                        option.value = p.name;
+                        option.textContent = p.name;
+                        printerSelect.appendChild(option);
+                    });
+                } else {
+                    printerSelect.innerHTML = '<option value="" disabled>Tidak ada printer ditemukan</option>';
+                }
+            } catch (err) {
+                printerSelect.innerHTML = '<option value="" disabled>Gagal memuat printer</option>';
+            }
+        }
+
+        async function loadMappings() {
+            try {
+                const res = await fetch('/api/mappings');
+                const data = await res.json();
+                mappingTableBody.innerHTML = '';
+                if (data.success && data.mappings.length > 0) {
+                    data.mappings.forEach(m => {
+                        const tr = document.createElement('tr');
+                        tr.className = 'hover:bg-slate-50 transition-colors group';
+                        tr.innerHTML = `
+                            <td class="px-5 py-3 whitespace-nowrap font-medium text-slate-800">${m.type}</td>
+                            <td class="px-5 py-3 whitespace-nowrap text-slate-500">${m.printerName}</td>
+                            <td class="px-5 py-3 whitespace-nowrap text-slate-500">
+                                ${m.paperSize || '<span class="text-slate-400 italic">Kertas Default</span>'}
+                                ${m.orientation ? `<span class="bg-slate-100 text-[10px] px-1.5 py-0.5 rounded uppercase font-bold ml-1">${m.orientation}</span>` : ''}
+                                ${m.margin ? `<br><span class="text-[10px] text-indigo-600 mt-1 block">Margin: ${m.margin}</span>` : ''}
+                            </td>
+                            <td class="px-5 py-3 whitespace-nowrap text-right">
+                                <div class="flex items-center justify-end gap-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                                    <button onclick="editMapping('${m.type}', '${m.printerName}', '${m.paperSize || ''}', '${m.orientation || ''}', '${m.margin || ''}')" class="text-indigo-500 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 p-1.5 rounded transition" title="Edit">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                    </button>
+                                    <button onclick="deleteMapping('${m.type}')" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-1.5 rounded transition" title="Hapus">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    </button>
+                                </div>
+                            </td>
+                        `;
+                        mappingTableBody.appendChild(tr);
+                    });
+                } else {
+                    mappingTableBody.innerHTML = '<tr><td colspan="4" class="px-5 py-6 text-center text-[12px] text-slate-400">Belum ada aturan rute.</td></tr>';
+                }
+            } catch (err) {
+                mappingTableBody.innerHTML = '<tr><td colspan="4" class="px-5 py-4 text-center text-[12px] text-red-500">Gagal memuat data</td></tr>';
+            }
+        }
+
+        function editMapping(type, printerName, paperSize, orientation, margin) {
+            typeInput.value = type;
+            Array.from(printerSelect.options).forEach(opt => {
+                if (opt.value === printerName) opt.selected = true;
+            });
+            document.getElementById('paperSizeInput').value = paperSize || '';
+            document.getElementById('orientationSelect').value = orientation || '';
+            
+            document.getElementById('marginTopInput').value = '';
+            document.getElementById('marginRightInput').value = '';
+            document.getElementById('marginBottomInput').value = '';
+            document.getElementById('marginLeftInput').value = '';
+            
+            if (margin) {
+                const parts = margin.split(' ').filter(Boolean);
+                if (parts.length === 4) {
+                    document.getElementById('marginTopInput').value = parts[0];
+                    document.getElementById('marginRightInput').value = parts[1];
+                    document.getElementById('marginBottomInput').value = parts[2];
+                    document.getElementById('marginLeftInput').value = parts[3];
+                } else if (parts.length === 1) {
+                    document.getElementById('marginTopInput').value = parts[0];
+                    document.getElementById('marginRightInput').value = parts[0];
+                    document.getElementById('marginBottomInput').value = parts[0];
+                    document.getElementById('marginLeftInput').value = parts[0];
+                }
+            }
+            typeInput.focus();
+        }
+
+        mappingForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const type = typeInput.value.trim();
+            const printerName = printerSelect.value;
+            const paperSize = document.getElementById('paperSizeInput').value.trim();
+            const orientation = document.getElementById('orientationSelect').value;
+            
+            const mT = document.getElementById('marginTopInput').value.trim();
+            const mR = document.getElementById('marginRightInput').value.trim();
+            const mB = document.getElementById('marginBottomInput').value.trim();
+            const mL = document.getElementById('marginLeftInput').value.trim();
+            
+            let margin = '';
+            if (mT || mR || mB || mL) {
+                margin = `${mT || '0mm'} ${mR || '0mm'} ${mB || '0mm'} ${mL || '0mm'}`;
+            }
+
+            if (!type || !printerName) return;
+            try {
+                const res = await fetch('/api/mappings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type, printerName, paperSize, orientation, margin })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    typeInput.value = '';
+                    printerSelect.value = '';
+                    document.getElementById('paperSizeInput').value = '';
+                    document.getElementById('orientationSelect').value = '';
+                    document.getElementById('marginTopInput').value = '';
+                    document.getElementById('marginRightInput').value = '';
+                    document.getElementById('marginBottomInput').value = '';
+                    document.getElementById('marginLeftInput').value = '';
+                    loadMappings();
+                } else {
+                    showMessage(data.message || 'Gagal menyimpan data', 'error');
+                }
+            } catch (err) {
+                showMessage('Terjadi kesalahan sistem', 'error');
+            }
+        });
+
+        async function deleteMapping(type) {
+            if (!confirm(`Hapus aturan rute untuk tipe dokumen '${type}'?`)) return;
+            try {
+                const res = await fetch(`/api/mappings/${type}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) loadMappings();
+            } catch (err) {
+                alert('Terjadi kesalahan');
+            }
+        }
+
+        function showMessage(msg, type) {
+            formMessage.textContent = msg;
+            formMessage.className = `mt-3 text-[12px] font-medium ${type === 'success' ? 'text-emerald-600' : 'text-red-600'} block animate-pulse`;
+            setTimeout(() => { formMessage.classList.add('hidden'); }, 3000);
+        }
+
+        async function loadJobs() {
+            try {
+                const res = await fetch('/api/jobs');
+                const data = await res.json();
+                jobTableBody.innerHTML = '';
+                if (data.success && data.jobs && data.jobs.length > 0) {
+                    data.jobs.forEach(job => {
+                        const tr = document.createElement('tr');
+                        const timeString = new Date(job.startTime).toLocaleTimeString('id-ID', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                        
+                        let cancelBtn = job.isCancelled 
+                            ? `<span class="text-[11px] text-slate-400 italic">Dibatalkan</span>`
+                            : `<button onclick="cancelJob('${job.id}')" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 py-1 px-2.5 rounded text-[11px] font-medium transition shadow-sm">Batal</button>`;
+
+                        tr.innerHTML = `
+                            <td class="px-5 py-3 whitespace-nowrap text-slate-500 font-mono text-[11px] md:text-[12px]">${timeString}</td>
+                            <td class="px-5 py-3 whitespace-nowrap font-medium text-slate-800">${job.type}</td>
+                            <td class="px-5 py-3 whitespace-nowrap text-slate-500 hidden sm:table-cell">${job.printerName}</td>
+                            <td class="px-5 py-3 whitespace-nowrap">
+                                <span class="inline-flex items-center gap-1.5 text-amber-600 font-medium text-[11px] md:text-[12px]">
+                                    <svg class="animate-spin h-3 w-3 text-amber-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                    ${job.status}
+                                </span>
+                            </td>
+                            <td class="px-5 py-3 whitespace-nowrap text-right">${cancelBtn}</td>
+                        `;
+                        jobTableBody.appendChild(tr);
+                    });
+                } else {
+                    jobTableBody.innerHTML = '<tr><td colspan="5" class="px-5 py-8 text-center text-[12px] md:text-[13px] text-slate-400 flex-col items-center justify-center"><svg class="w-8 h-8 text-slate-200 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>Tidak ada antrean cetak saat ini.</td></tr>';
+                }
+            } catch (err) {
+                jobTableBody.innerHTML = '<tr><td colspan="5" class="px-5 py-4 text-center text-[12px] md:text-[13px] text-red-500">Gagal memuat job</td></tr>';
+            }
+        }
+
+        async function cancelJob(id) {
+            try {
+                await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
+                loadJobs();
+            } catch (err) {}
+        }
+
+        let logPage = 1;
+        const logLimit = 10;
+        
+        function resetLogPage() { logPage = 1; }
+        function prevLogPage() { if (logPage > 1) { logPage--; loadLogs(); } }
+        function nextLogPage() { logPage++; loadLogs(); }
+
+        async function loadLogs() {
+            try {
+                const status = document.getElementById('logFilterStatus')?.value || 'all';
+                const res = await fetch(`/api/logs?status=${status}&page=${logPage}&limit=${logLimit}`);
+                const data = await res.json();
+                const logTableBody = document.getElementById('logTableBody');
+                logTableBody.innerHTML = '';
+                
+                if (data.success && data.logs && data.logs.length > 0) {
+                    data.logs.forEach(log => {
+                        const tr = document.createElement('tr');
+                        const timeString = new Date(log.timestamp).toLocaleTimeString('id-ID', { hour12: false, month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                        
+                        const statusBadge = log.status === 'sukses' 
+                            ? `<span class="bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] md:text-[11px] px-1.5 md:px-2 py-0.5 rounded font-medium">Sukses</span>` 
+                            : `<span class="bg-red-50 text-red-600 border border-red-200 text-[10px] md:text-[11px] px-1.5 md:px-2 py-0.5 rounded font-medium">Gagal</span>`;
+                        
+                        tr.className = 'hover:bg-slate-50 transition-colors';
+                        tr.innerHTML = `
+                            <td class="px-5 py-3 whitespace-nowrap text-slate-500 font-mono text-[10px] md:text-[11px]">${timeString}</td>
+                            <td class="px-5 py-3 whitespace-nowrap font-medium text-slate-800">${log.type}</td>
+                            <td class="px-5 py-3 whitespace-nowrap text-slate-500 hidden sm:table-cell">${log.printerName}</td>
+                            <td class="px-5 py-3 whitespace-nowrap">${statusBadge}</td>
+                            <td class="px-5 py-3 text-slate-500 text-[10px] md:text-[11px] hidden md:table-cell truncate max-w-[150px]" title="${log.message}">${log.message}</td>
+                        `;
+                        logTableBody.appendChild(tr);
+                    });
+                    
+                    const startIdx = ((data.page - 1) * data.limit) + 1;
+                    const endIdx = Math.min(data.page * data.limit, data.total);
+                    document.getElementById('logPageInfo').textContent = `Menampilkan ${startIdx}-${endIdx} dari ${data.total}`;
+                    
+                    document.getElementById('btnPrevLog').disabled = data.page <= 1;
+                    document.getElementById('btnNextLog').disabled = endIdx >= data.total;
+                } else {
+                    logTableBody.innerHTML = '<tr><td colspan="5" class="px-5 py-8 text-center text-[12px] text-slate-400 italic">Data tidak ditemukan</td></tr>';
+                    document.getElementById('logPageInfo').textContent = `Menampilkan 0 dari 0`;
+                    document.getElementById('btnPrevLog').disabled = logPage <= 1;
+                    document.getElementById('btnNextLog').disabled = true;
+                }
+            } catch (err) {
+                document.getElementById('logTableBody').innerHTML = '<tr><td colspan="5" class="px-5 py-4 text-center text-[12px] md:text-[13px] text-red-500">Gagal memuat log</td></tr>';
+                document.getElementById('logPageInfo').textContent = 'Error';
+            }
+        }
+
+        async function shutdownAgent() {
+            if (!confirm('Peringatan: Komputer ini akan berhenti menerima permintaan print dari sistem sampai agent dijalankan kembali.\n\nMatikan Print Agent?')) return;
+            try {
+                await fetch('/api/shutdown', { method: 'POST' });
+                document.body.innerHTML = '<div class="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white"><h1 class="text-2xl font-bold mb-2">Service Offline</h1><p class="text-slate-400 text-sm">AIRA Local Print Agent telah dimatikan.</p></div>';
+            } catch (err) {
+                document.body.innerHTML = '<div class="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white"><h1 class="text-2xl font-bold mb-2">Service Offline</h1><p class="text-slate-400 text-sm">AIRA Local Print Agent telah dimatikan.</p></div>';
+            }
+        }
+
+        function lockAgent() {
+            sessionStorage.removeItem('agent_token');
+            if (typeof dashboardIntervals !== 'undefined') {
+                dashboardIntervals.forEach(clearInterval);
+                dashboardIntervals = [];
+            }
+            showAuthModal('login');
+        }
+
+        function showChangePasswordModal() {
+            document.getElementById('changePasswordOverlay').classList.remove('hidden');
+        }
+
+        function closeChangePasswordModal() {
+            document.getElementById('changePasswordOverlay').classList.add('hidden');
+            document.getElementById('changePasswordForm').reset();
+        }
+
+        const cpForm = document.getElementById('changePasswordForm');
+        if (cpForm) {
+            cpForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const oldPassword = document.getElementById('cpOldPassword').value;
+                const newPassword = document.getElementById('cpNewPassword').value;
+                
+                try {
+                    const res = await fetch('/api/auth/change', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ oldPassword, newPassword })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        alert('Password berhasil diubah!');
+                        sessionStorage.setItem('agent_token', data.token);
+                        closeChangePasswordModal();
+                    } else {
+                        alert(data.message || 'Gagal mengubah password');
+                    }
+                } catch (err) {
+                    alert('Terjadi kesalahan sistem saat mengubah password');
+                }
+            });
+        }
+
+        // Initialization handled by checkAuthStatus()
+        checkAuthStatus();
+    </script>
+</body>
+</html>
