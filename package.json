@@ -1,6 +1,6 @@
 {
   "name": "local-print-agent",
-  "version": "1.0.5",
+  "version": "1.0.8",
   "description": "",
   "main": "server.js",
   "bin": "server.js",
@@ -20,7 +20,7 @@
   "dependencies": {
     "axios": "^1.18.1",
     "cors": "^2.8.6",
-    "express": "^5.2.1",
+    "express": "^4.21.1",
     "fs-extra": "^11.3.6",
     "lowdb": "^1.0.0",
     "pdf-to-printer": "^5.8.0",

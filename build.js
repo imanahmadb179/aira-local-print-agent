@@ -30,7 +30,7 @@ console.log(`[INFO] Versi diupdate ke v${newVersion} di public/index.html`);
 // 4. Jalankan proses build (pkg)
 console.log('[INFO] Memulai proses build executable...');
 try {
-    execSync('npx pkg . --targets node16-linux-x64,node16-win-x64 --output dist/AIRA-Print-Agent', { stdio: 'inherit' });
+    execSync('npx pkg . --targets node16-linux-x64,node14-win-x64 --output dist/AIRA-Print-Agent', { stdio: 'inherit' });
     console.log(`[SUCCESS] Build aplikasi versi ${newVersion} selesai!`);
 } catch (err) {
     console.error('[ERROR] Proses build gagal:', err.message);
