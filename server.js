@@ -187,7 +187,7 @@ app.get('/api/mappings', requireAuth, (req, res) => {
 });
 
 app.post('/api/mappings', requireAuth, (req, res) => {
-    const { type, printerName, paperSize, orientation, margin, scale } = req.body;
+    const { type, printerName, paperSize, orientation, margin, scale, zoom } = req.body;
     if (!type || !printerName) {
         return res.status(400).json({ success: false, message: 'Tipe dan Nama Printer wajib diisi' });
     }
@@ -197,11 +197,12 @@ app.post('/api/mappings', requireAuth, (req, res) => {
     const orientationVal = orientation || "";
     const marginVal = margin ? margin.trim() : "";
     const scaleVal = scale || "";
+    const zoomVal = zoom ? zoom.trim() : "";
     
     if (existing) {
-        db.get('mappings').find({ type }).assign({ printerName, paperSize: paperSizeVal, orientation: orientationVal, margin: marginVal, scale: scaleVal }).write();
+        db.get('mappings').find({ type }).assign({ printerName, paperSize: paperSizeVal, orientation: orientationVal, margin: marginVal, scale: scaleVal, zoom: zoomVal }).write();
     } else {
-        db.get('mappings').push({ type, printerName, paperSize: paperSizeVal, orientation: orientationVal, margin: marginVal, scale: scaleVal }).write();
+        db.get('mappings').push({ type, printerName, paperSize: paperSizeVal, orientation: orientationVal, margin: marginVal, scale: scaleVal, zoom: zoomVal }).write();
     }
     res.json({ success: true, message: 'Pengaturan berhasil disimpan' });
 });
@@ -294,17 +295,20 @@ app.post('/print', async (req, res) => {
             margin = mapping.margin || "";
             scale = mapping.scale || "";
             
+            let zoom = mapping.zoom || "";
+            
             try {
                 const urlObj = new URL(url);
                 if (paperSize) urlObj.searchParams.set('paperSize', paperSize);
                 if (orientation) urlObj.searchParams.set('orientation', orientation);
                 if (margin) urlObj.searchParams.set('margin', margin);
+                if (zoom) urlObj.searchParams.set('zoom', zoom);
                 url = urlObj.toString();
             } catch(e) {
                 console.warn("[WARNING] Invalid URL format for appending parameters", e);
             }
             
-            console.log(`[INFO] Tipe '${type}' diarahkan ke printer: ${printerName}` + (paperSize ? ` dengan kertas ${paperSize}` : '') + (orientation ? ` (${orientation})` : '') + (margin ? ` (margin: ${margin})` : '') + (scale ? ` (skala: ${scale})` : ''));
+            console.log(`[INFO] Tipe '${type}' diarahkan ke printer: ${printerName}` + (paperSize ? ` dengan kertas ${paperSize}` : '') + (orientation ? ` (${orientation})` : '') + (margin ? ` (margin: ${margin})` : '') + (scale ? ` (skala: ${scale})` : '') + (zoom ? ` (zoom: ${zoom}%)` : ''));
         } else if (!printerName) {
              return res.status(400).json({ success: false, message: `Tipe dokumen '${type}' belum didaftarkan di Local Print Agent. Buka dashboard agent (http://127.0.0.1:18080) dan tambahkan mapping untuk tipe ini.` });
         }
