@@ -45,6 +45,7 @@ allMappings.forEach(m => {
     if (m.paperSize === undefined) { m.paperSize = ""; migrationNeeded = true; }
     if (m.orientation === undefined) { m.orientation = ""; migrationNeeded = true; }
     if (m.margin === undefined) { m.margin = ""; migrationNeeded = true; }
+    if (m.scale === undefined) { m.scale = ""; migrationNeeded = true; }
 });
 if (migrationNeeded) {
     db.set('mappings', allMappings).write();
@@ -74,6 +75,45 @@ app.use(express.static(path.join(__dirname, 'public'), {
 
 // Active jobs tracker
 let activeJobs = [];
+
+// Antrean Print (Queue) agar request ke backend tidak concurrent (karena artisan serve single-thread)
+class PrintQueue {
+    constructor() {
+        this.queue = [];
+        this.isProcessing = false;
+    }
+
+    add(task) {
+        return new Promise((resolve, reject) => {
+            this.queue.push(async () => {
+                try {
+                    await task();
+                    resolve();
+                } catch (err) {
+                    reject(err);
+                }
+            });
+            this.processNext();
+        });
+    }
+
+    async processNext() {
+        if (this.isProcessing || this.queue.length === 0) return;
+        this.isProcessing = true;
+        
+        while (this.queue.length > 0) {
+            const task = this.queue.shift();
+            try {
+                await task();
+            } catch (err) {
+                console.error('[Queue Error]', err);
+            }
+        }
+        
+        this.isProcessing = false;
+    }
+}
+const jobQueue = new PrintQueue();
 
 // --- API Pengaturan Printer ---
 
@@ -147,7 +187,7 @@ app.get('/api/mappings', requireAuth, (req, res) => {
 });
 
 app.post('/api/mappings', requireAuth, (req, res) => {
-    const { type, printerName, paperSize, orientation, margin } = req.body;
+    const { type, printerName, paperSize, orientation, margin, scale } = req.body;
     if (!type || !printerName) {
         return res.status(400).json({ success: false, message: 'Tipe dan Nama Printer wajib diisi' });
     }
@@ -156,11 +196,12 @@ app.post('/api/mappings', requireAuth, (req, res) => {
     const paperSizeVal = paperSize ? paperSize.trim() : "";
     const orientationVal = orientation || "";
     const marginVal = margin ? margin.trim() : "";
+    const scaleVal = scale || "";
     
     if (existing) {
-        db.get('mappings').find({ type }).assign({ printerName, paperSize: paperSizeVal, orientation: orientationVal, margin: marginVal }).write();
+        db.get('mappings').find({ type }).assign({ printerName, paperSize: paperSizeVal, orientation: orientationVal, margin: marginVal, scale: scaleVal }).write();
     } else {
-        db.get('mappings').push({ type, printerName, paperSize: paperSizeVal, orientation: orientationVal, margin: marginVal }).write();
+        db.get('mappings').push({ type, printerName, paperSize: paperSizeVal, orientation: orientationVal, margin: marginVal, scale: scaleVal }).write();
     }
     res.json({ success: true, message: 'Pengaturan berhasil disimpan' });
 });
@@ -243,6 +284,7 @@ app.post('/print', async (req, res) => {
     let paperSize = "";
     let orientation = "";
     let margin = "";
+    let scale = "";
     if (type) {
         const mapping = db.get('mappings').find({ type }).value();
         if (mapping && mapping.printerName) {
@@ -250,6 +292,7 @@ app.post('/print', async (req, res) => {
             paperSize = mapping.paperSize || "";
             orientation = mapping.orientation || "";
             margin = mapping.margin || "";
+            scale = mapping.scale || "";
             
             try {
                 const urlObj = new URL(url);
@@ -261,7 +304,7 @@ app.post('/print', async (req, res) => {
                 console.warn("[WARNING] Invalid URL format for appending parameters", e);
             }
             
-            console.log(`[INFO] Tipe '${type}' diarahkan ke printer: ${printerName}` + (paperSize ? ` dengan kertas ${paperSize}` : '') + (orientation ? ` (${orientation})` : '') + (margin ? ` (margin: ${margin})` : ''));
+            console.log(`[INFO] Tipe '${type}' diarahkan ke printer: ${printerName}` + (paperSize ? ` dengan kertas ${paperSize}` : '') + (orientation ? ` (${orientation})` : '') + (margin ? ` (margin: ${margin})` : '') + (scale ? ` (skala: ${scale})` : ''));
         } else if (!printerName) {
              return res.status(400).json({ success: false, message: `Tipe dokumen '${type}' belum didaftarkan di Local Print Agent. Buka dashboard agent (http://127.0.0.1:18080) dan tambahkan mapping untuk tipe ini.` });
         }
@@ -299,8 +342,14 @@ app.post('/print', async (req, res) => {
         }
     };
 
+    // Karena PDF di-generate oleh backend (artisan serve) yang single-thread,
+    // kita harus proses unduhan secara bergiliran menggunakan Queue.
     try {
-        console.log(`[INFO] Mengunduh dokumen dari: ${url}`);
+        await jobQueue.add(async () => {
+            if (jobInfo.isCancelled) throw new Error('Dibatalkan sebelum masuk antrean');
+            
+            jobInfo.status = 'Mengunduh dokumen...';
+            console.log(`[INFO] Mengunduh dokumen dari: ${url}`);
         
         const http = require('http');
         const https = require('https');
@@ -350,7 +399,7 @@ app.post('/print', async (req, res) => {
         const windowsPrintOptions = { 
             printer: printerName, 
             sumatraPdfPath: sumatraDest,
-            scale: 'shrink', // Menggunakan shrink agar dokumen yang terlalu besar akan dikecilkan agar pas, mencegah terpotong
+            scale: scale || 'shrink', // Menggunakan shrink secara default atau mengikuti mapping
             monochrome: true
         };
         if (paperSize) {
@@ -360,7 +409,19 @@ app.post('/print', async (req, res) => {
             windowsPrintOptions.orientation = orientation;
         }
 
-        let linuxLpCommand = `lp "${tempFilePath}" -d "${printerName}" -o fit-to-page -o print-scaling=fit -o page-left=0 -o page-right=0 -o page-top=0 -o page-bottom=0`;
+        let linuxLpCommand = `lp "${tempFilePath}" -d "${printerName}"`;
+        if (scale === 'noscale') {
+            linuxLpCommand += ` -o print-scaling=none`;
+        } else {
+            linuxLpCommand += ` -o fit-to-page -o print-scaling=fit`;
+        }
+        
+        // Hanya override margin jika didefinisikan (agar bisa menggunakan default print server)
+        if (margin) {
+            // Margin dari mapping biasanya format: "10mm 10mm 10mm 10mm" (Atas Kanan Bawah Kiri)
+            linuxLpCommand += ` -o page-top=${margin.split(' ')[0] || 0} -o page-right=${margin.split(' ')[1] || 0} -o page-bottom=${margin.split(' ')[2] || 0} -o page-left=${margin.split(' ')[3] || 0}`;
+        }
+
         if (paperSize) linuxLpCommand += ` -o media="${paperSize}"`;
         if (orientation === 'landscape') linuxLpCommand += ` -o landscape`;
         else if (orientation === 'portrait') linuxLpCommand += ` -o portrait`;
@@ -389,6 +450,8 @@ app.post('/print', async (req, res) => {
         } catch (logErr) {
             console.error('[WARNING] Gagal menyimpan log sukses:', logErr.message);
         }
+
+        }); // End of Queue task
 
         // Cleanup file temp setelah log tercatat
         await cleanupTempFile();
