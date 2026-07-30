@@ -10,10 +10,12 @@ AIRA Print Agent adalah aplikasi _background service_ (agen lokal) berbasis Node
 - **Cross-Platform**: Mendukung penuh sistem operasi Windows dan Linux.
 - **Dynamic Routing & Mapping**: Menentukan printer tujuan, ukuran kertas kustom, dan orientasi (Portrait/Landscape) berdasarkan _tipe dokumen_ (misal: `kartu_pasien` ke Printer A ukuran A5, `struk_kasir` ke Printer B ukuran Thermal).
 - **Auto-Scaling / Fit to Paper**: Menggunakan algoritma _shrink-to-fit_ untuk memastikan dokumen tercetak sempurna tanpa terpotong.
+- **Pengaturan Lanjutan (Advanced)**: Mendukung kustomisasi Margin, Zoom, dan Orientasi dokumen langsung melalui Dashboard Agent.
+- **Sequential Print Queue**: Sistem antrean bawaan (Queue) yang mencegah _blocking_ atau _deadlock_ saat menerima permintaan masal, khususnya bagi backend berjenis _single-thread_ (seperti `php artisan serve`).
 - **Local Dashboard**: Antarmuka web lokal yang bersih (berbasis Tailwind CSS) untuk mengatur _mapping_ printer dan memonitor riwayat cetak.
 - **Keamanan Terpusat**: Akses ke dashboard lokal dilindungi oleh sistem Autentikasi/Password lokal.
 - **Standalone Executable**: Dapat dikompilasi menjadi file `.exe` tunggal (tanpa perlu install Node.js di komputer klien) menggunakan `pkg`.
-- **Auto Versioning**: Sistem kompilasi cerdas yang otomatis menaikkan angka versi aplikasi dan memperbarui dashboard saat proses _build_ dijalankan.
+- **Auto Versioning**: Sistem kompilasi cerdas (`build.js`) yang otomatis menaikkan angka versi aplikasi dan memperbarui dashboard saat proses _build_ dijalankan.
 
 ## 🛠️ Teknologi yang Digunakan
 
@@ -49,11 +51,11 @@ Buka browser dan akses URL tersebut untuk membuka Dashboard Konfigurasi.
 Untuk kemudahan distribusi di komputer klien (tanpa install Node), Anda dapat membangun file _executable_.
 
 ```bash
-# Install pkg secara global (opsional)
+# Install pkg secara global (sekali saja)
 npm install -g pkg
 
-# Build executable untuk Windows & Linux
-npm run build
+# Jalankan script build (akan otomatis menaikkan versi dan mengkompilasi executable)
+node build.js
 ```
 
 Hasil build akan berada di dalam folder `dist/`. Anda cukup menyalin file `AIRA-Print-Agent.exe` ke komputer klien dan menjalankannya (bisa dimasukkan ke dalam folder _Startup_ Windows agar berjalan otomatis saat komputer menyala).
@@ -69,7 +71,8 @@ Aplikasi web Anda (Angular, React, Vue, Laravel, dll) hanya perlu mengirimkan HT
 ```json
 {
   "url": "http://domain-anda.com/api/print/dokumen.pdf",
-  "type": "kartu_pasien"
+  "type": "kartu_pasien",
+  "printerName": "Epson L3110" 
 }
 ```
 
@@ -77,7 +80,24 @@ _Catatan:_
 
 - `url`: Harus berisi link absolut yang mengembalikan file biner PDF.
 - `type`: Tipe dokumen ini harus sudah didaftarkan pada Dashboard Local Print Agent (menu _Mapping/Rute Cetak_).
-- **Penting:** Jika Anda mengatur Ukuran Kertas (_Paper Size_) dan Orientasi pada Dashboard, Print Agent akan otomatis menyisipkannya sebagai _query parameter_ ke dalam URL ini (contoh: `?paperSize=A5&orientation=landscape`). Aplikasi backend Anda dapat menangkap parameter ini untuk menghasilkan ukuran PDF yang dinamis sesuai pengaturan.
+- `printerName` (opsional): Jika Anda ingin mem-_bypass_ mapping dashboard dan langsung menunjuk nama printer spesifik dari aplikasi Anda.
+- **Penting:** Jika Anda mengatur Ukuran Kertas (_Paper Size_), Orientasi, **Margin**, atau **Zoom** pada Dashboard, Print Agent akan otomatis menyisipkannya sebagai _query parameter_ ke dalam URL ini (contoh: `?paperSize=A5&orientation=landscape&margin=10mm%2010mm%2010mm%2010mm&zoom=80`). Aplikasi backend Anda dapat menangkap parameter ini untuk menghasilkan ukuran PDF yang dinamis sesuai pengaturan.
+
+### Mendapatkan Daftar Printer dari OS Lokal
+
+**Endpoint:** `GET http://localhost:18080/printers`
+
+_Response:_
+```json
+{
+  "success": true,
+  "printers": [
+    { "name": "Epson L3110" },
+    { "name": "Microsoft Print to PDF" }
+  ]
+}
+```
+API ini sangat berguna jika Anda ingin menampilkan daftar *dropdown* printer langsung di dalam aplikasi Web/Angular Anda.
 
 **Contoh Integrasi di Frontend (JavaScript/Fetch):**
 
@@ -119,6 +139,21 @@ $pdf = \PDF::loadView('template.dokumen', $data);
 $pdf->setPaper($paperSize, $orientation);
 
 return $pdf->stream('dokumen.pdf');
+```
+
+**Menangani Parameter Zoom & Margin di Blade (HTML to PDF):**
+Jika Anda menggunakan fitur Zoom dan Margin pada Print Agent, Anda dapat mengaturnya lewat CSS sebaris pada template HTML Anda:
+```html
+<style>
+  @if(request('margin'))
+  @page {
+      margin: {{ request('margin') }} !important;
+  }
+  @endif
+</style>
+<body style="background:#fff; margin:0; @if(request('zoom')) zoom: {{request('zoom')}}%; transform: scale({{request('zoom')/100}}); transform-origin: top center; @endif">
+    <!-- Konten Dokumen Anda -->
+</body>
 ```
 
 ## ⚙️ Konfigurasi Kertas Khusus (Custom Paper Size)
